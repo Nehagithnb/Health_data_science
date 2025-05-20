@@ -1,0 +1,556 @@
+---
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+# PMIM402J MACHINE LEARNING IN HEALTHCARE
+
+# PART 2: CLASSIFICATION ASSIGNMENT
+
+## NEHA 2254818
+
+DATASET - "heart_modified.csv" (Classification Data)
+
+Question 1
+
+Pre-processing data into the most effective format is where I'm starting.
+To make sure the data is accurate, thorough, and of high quality, I am doing these steps.
+A portion of the original data is set aside so that I may evaluate how generalisable the models are, before putting it to the test and evaluating its performance, will train two classifiers that are distinct from one another.
+
+Starting with organizing the data collection and modifying a few attributes' formats will help models grasp it better.
+
+Importing Libraries
+
+```{r}
+library(caret)
+library(tidyverse)    
+library(mltools) 
+library(pROC)
+library(randomForest)
+library(rpart)
+library(MLeval) 
+library(e1071)
+```
+
+## Import heart disease data set
+
+```{r}
+heart_dis <- read.csv("/Users/neha-/Desktop/PMIM402J-MLH/classification data.csv")  
+```
+
+## Fixing the global seed for reproducibility(across different runs of the script)
+
+```{r}
+set.seed(15) 
+```
+
+Giving the random number generator a seed.
+As a result, it will be simpler to compare and validate the output and will help to provide consistent outcomes.
+
+The settings for the size of the plots that will be made later in this R session are being set since I will be making them.
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=10)
+```
+
+the size of plots will have width of 14 inches and height of 10 inches.
+Renaming attributes to make it understandable.
+
+```{r}
+renamed_attr = c(
+    'id', 'male', 'age',
+    'pace_maker', 'chest_pain', 'resting_blood_pressure',
+    'cholesterol', 'fasting_blood_sugar', 'resting_ecg_result',
+    'max_heart_rate', 'exercise_angina', 'relative_st_depression',
+    'thallium_perfusion', 'peak_st_slope', 'fluoroscopy_test_result',
+    'thallium_test_result', 'smoker', 'drugs_taken',
+    'troponin_level', 'family_history', 'class'
+)
+```
+
+```{r}
+colnames(heart_dis) <- renamed_attr
+```
+
+Describing the data set
+
+```{r}
+str(heart_dis)
+```
+
+We can determine that data organization is required by looking at the data set.
+I shall remove the data from the 'id' column because it is not required.
+The 'pace_maker' column will also be removed because it has the same value across all rows.
+
+```{r}
+heart_dis <- subset(heart_dis, select = -c(id, pace_maker))
+```
+
+I am attempting to examine it once after the extraneous columns have been deleted.
+
+```{r}
+view(heart_dis)
+```
+
+Checking if there are any NA/missing values
+
+```{r}
+    na <- function(dataframe) {
+      any(
+        # Check each column for NA values
+        apply(
+          X = dataframe,   
+          MARGIN = 2,    
+          FUN = function(x) any(is.na(x))    
+        )
+      )
+    }
+  if (na(heart_dis)) paste("the data frame has NA values!") else paste("No NA values found")
+```
+
+There are no NA values shown in the data collection.
+But there will be some formatting problems to fix.
+It's crucial to categorize the data while also making it comprehensible to the algorithm.
+This also includes a blend of Continuous, Categorical, and Ordinal data, just as the data from the Clustering assignment.
+The ordering of continuous and ordinal data can be represented in real coordinate space and used to compare distances between them to distinguish between different classes.
+There is basically no such ordering for categorical data; instead, it will be transformed into another type of representation, such as dummy or one-hot encoding, which requires the division of category characteristics into binary, due to the sparsity of encoding, which restricts the efficacy of many classifier algorithms.
+As a result, I'll utilize one-hot encoding for some characteristics, while factor-type can be used for some attributes that have a large number of discrete values.
+Changing the way the male, fasting_blood_sugar, has_exercise_angina, and is_smoker variables are saved from 0/1 to yes/no.
+The class variable from 0/1 through dx_negative/dx_positive is also included.
+Using strings, "Aspirin", "Clopidogrel", "None", and "Both" are also translated into binary values like has_taken_aspirin and has_taken_clopidogrel.
+Chest pain types are categorized as follows: 1, 2, 3, 4 for typical angina, atypical angina, non-anginal pain, and asymptomatic.
+The results of the resting ECG ranged from 0, 1, and 2 to normal, aberrant st-t waves, and left ventricular hypertrophy, respectively.
+peak_st_slope from 1 to 3 indicates an upward, downward, or flat slope, respectively.
+Test results for thallium 3 through 7 are normal, fixed, and reversible defects, respectively.
+This will enable us to comprehend the classifiers' judgments better.
+All the adjustments indicated above are incorporated below.
+
+```{r}
+heart_dis <- subset(
+    transform(
+        heart_dis,
+        # changing the data values to much explanatory values
+        male = as.factor(ifelse(male == 1, "yes", "no")),
+        fasting_blood_sugar = as.factor(ifelse(fasting_blood_sugar == 1, "yes", "no")),
+        exercise_angina = as.factor(ifelse(exercise_angina == 1, "yes", "no")),
+        smoker = as.factor(ifelse(smoker == 1, "yes", "no")),
+        taken_aspirin = as.factor(ifelse(drugs_taken == "Aspirin" | drugs_taken == "Both", "yes", "no")),
+        taken_clopidogrel = as.factor(ifelse(drugs_taken == "Clopidogrel" | drugs_taken == "Both", "yes", "no")),
+        class = as.factor(ifelse(class == 1, "dx_positive", "dx_negative")),
+        
+        # attribute values are replaced by more understandable values
+        chest_pain = as.factor(ifelse(chest_pain == 1, "typical_angina", ifelse(chest_pain == 2, "atypical_angina", ifelse(chest_pain == 3, "non-anginal_pain", "asymptomatic")))),
+        resting_ecg_result = as.factor(ifelse(resting_ecg_result == 0, "normal", ifelse(resting_ecg_result == 1, "st-t_wave_abnormality", "left_ventricular_hypertrophy"))),
+        peak_st_slope = as.factor(ifelse(peak_st_slope == 1, "upsloping", ifelse(peak_st_slope == 2, "flat", "downsloping"))),
+        thallium_test_result = as.factor(ifelse(thallium_test_result == 3, "normal", ifelse(thallium_test_result == 6, "fixed_defect", "reversible_defect")))
+    ),
+    # Removing 'drugs_taken' attribute
+    select = -c(drugs_taken)
+)
+```
+
+Viewing the changes made on the dataset
+
+```{r}
+head(heart_dis, 10)
+```
+
+Although R factor attributes contain discrete values, it is preferable to level these values so that the value of interest is given priority.
+In order to level the dx_positive, the ground truth needs to be reorganized.
+Without providing an ordering to our attribute, 'fct_relevel' is used to rearrange the data.
+
+```{r}
+heart_dis$class <- fct_relevel(heart_dis$class, "dx_positive", "dx_negative")
+heart_dis$resting_ecg_result <- fct_relevel(heart_dis$resting_ecg_result, "normal", "left_ventricular_hypertrophy", "st-t_wave_abnormality")
+heart_dis$peak_st_slope <- fct_relevel(heart_dis$peak_st_slope, "flat", "upsloping", "downsloping")
+```
+
+Checking if the reordered attributes are still unordered
+
+```{r}
+if (is.ordered(heart_dis$class) & is.ordered(heart_dis$resting_ecg_result) & is.ordered(heart_dis$peak_st_slope)) {
+    paste("Ordered the categorical attributes.")
+} else {
+    paste("Categorical attributes are not changed.")
+}
+```
+
+The last stage of pre-processing involves splitting the data set into training and testing subgroups.
+Since there are not many samples in the data set, validation is done to determine which model is the best.
+Samples required to train or fit the model are in the training set.
+Only the final test set will be utilized to determine how well the model generalizes to previously unexplored data from the actual world.
+This guarantees that it won't overfit the data set.
+Fct_relevel is used to reorder data without changing the attribute's ordering.
+
+For a balanced random sample of the data set, divide the training and testing sets by 60% and 40%, respectively, using createDataPartition from the caret package.
+This guarantees a 1 to 0 ratio in the ground truth attribute class.
+
+Performing a balanced 60%/40% split of samples in heart data set
+
+```{r}
+partition_trainingset <- createDataPartition(
+    heart_dis$class,
+    p = 0.6,
+    list = FALSE
+  )
+```
+
+Extracting training set as balanced 60% of heart data set
+
+```{r}
+training_set = heart_dis[partition_trainingset,]
+```
+
+Extracting test set as balanced 40% of heart data set
+
+```{r}
+test_set = heart_dis[-partition_trainingset,]
+```
+
+Checking size of new subsets
+
+```{r}
+cat(
+  " The 'heart_disease' data set has ", nrow(heart_dis), "samples.\n",
+  "  Training set has ", nrow(training_set), "samples.\n",
+  "  Test set has ", nrow(test_set), "samples.\n"
+)
+```
+
+After that, the sets are divided so that predictor variable x and response variable y could be input into the classifier models separately:
+
+```{r}
+X_trainset = subset(training_set, select = -c(class))
+y_trainset = training_set$class
+
+X_testset = subset(test_set, select = -c(class))
+y_testset = test_set$class
+```
+
+I'll use the Support Vector Machine as my initial classifier.
+SVMs are coordinate-based classifiers that seek for the best hyperplanes to divide the classes that are being attempted to be predicted.
+The best hyperplane is chosen using the training data, and the model will classify new data according to which side of the hyperplane it will be, when it encounters it.
+
+By dividing the data set into k folds and incrementally setting aside each 1 k of the data set as a validation set, k-fold cross validation will be used to evaluate the model's performance.
+Each fold's prediction error is calculated, and the classifier's final error value is obtained by averaging these errors.
+It is necessary to strike the balance between k too low since smaller fold sizes provide training sets that are not representative of the larger data set, which would increase the variance if it were set too high, which would also increase bias.
+An acceptable number for k samples might be 5.
+
+Setting k value for cross validation:
+
+```{r}
+k = 5
+
+# Define model-agnostic training control options
+training_controls <- trainControl(
+        method = "cv",              # Resample using k-fold cross validation
+        number = k,                 # Value for k
+        savePredictions = TRUE,     # Save predictions at each resampling
+        classProbs = TRUE           # Additionally, compute class probabilities                                     # at each resampling
+)
+
+ 
+# Train RF model
+rf_default <- train(
+   X_trainset, y_trainset,
+   method = "rf",               # Use library(randomForest) model
+   trControl = training_controls,# Fix hyperparameter 'mtry' at default 
+                                 # value of sqrt(p)                   
+                                 # where p is the number #of attributes in #                                    # the data set
+    tuneGrid = expand.grid(
+      mtry = floor(sqrt(length(training_set)))
+    )
+)
+
+# Train SVM  model
+svm <- train( X_trainset, y_trainset,
+              method = 'svmLinear',
+              trControl = training_controls)
+```
+
+Viewing model details
+
+```{r}
+print(svm)
+```
+
+Generating the confusion matrix
+
+```{r}
+confusionMatrix(svm, norm = "none")
+```
+
+The accuracy value of the model, which is 0.8219581, indicates that the model's overall accuracy, averaged across the folds, is 82% as can be seen from the data provided above.
+The confusion matrix's top right value, which shows that 67 members of the training set were projected to have disease but didn't, indicates the number of patients who were incorrectly identified as being at risk for getting heart disease.
+Only 0.6381843, or a moderate level of variance, can be seen in the Kappa value, which measures the degree of agreement between the folds.
+
+This accuracy indicates the overall accuracy of the model, but other options include sensitivity, which is a measure of the number of true positives / total positives (TP + FN), and specificity, which is a measure of the number of true negatives / total negatives (TN + FP).
+The confusion matrix only provides you with one indicator of this, but these two values can be traded off for one another.
+For example, if it were more crucial for the model to identify everyone who would eventually develop heart disease, you could 'bias' the model to do so in the knowledge that you would receive more falsely positive results.
+A ROC curve that depicts the True Positive Rate (Sensitivity) vs. False Positive Rate (1-Specificity) can be used to visualize this trade-off.
+
+Plot ROC curve for svm classifier
+
+```{r}
+. <- evalm(
+  svm,
+  silent = TRUE,    # Silence bloody spam output
+  title = "ROC Curve: Support Vector Machine",
+  plots = "r"    # Select ROC curve
+)
+```
+
+It is possible to calculate the AUC-ROC value from the ROC curve.
+Another indicator of model accuracy is the likelihood that the classifier will score a randomly positive instance higher than a randomly negative one.
+AUC-ROC values range from 0 for a classifier that performs no better than a random guess (seen on the graph as the straight diagonal line) to 1 for a perfect classifier.
+The SVM's AUC-ROC value of 0.87 suggests that it is a reasonably effective classifier.
+
+Testing the classifiers
+
+Using the unseen test data set, the classifiers can now be compared.
+They performed pretty similarly during cross validation, so it will be interesting to see if that holds true for this test.
+
+SVM
+
+```{r}
+svm_pred = predict(svm, X_testset)
+
+confusionMatrix(svm_pred, y_testset)
+```
+
+Question 2
+
+For this question, I will optimize the Random Forest model.
+There are a few factors that led to this decision.
+First, based on the findings so far, this model had the highest drop down when considering data that had not yet been observed, therefore it would be fascinating to see if this might be fixed by optimization.
+Additionally, because the model is designed with numerous decision trees, it is easy to assess which features the model values highly and, if any, to decide which ones, if any, can be eliminated.
+
+A random forest is simply an ensemble of individual decision trees that are trained on random subsets of data and 'vote' on the overall classification that the model generates.
+The theoretical underpinnings of this model have already been discussed.
+
+Since the use case requires a model with higher sensitivity to ensure that patients with heart disease are detected, optimizing the rndom forest model to this problem despite its slower lower accuracy.
+The random forest reasonings are essentially collection of individual decision trees taht is trained using random subsets of data.
+Machine learning algorithms that require the least amount of input data to provide highly accurate results are advantageous.
+This is where model pruning comes into play, where just take out of the data set qualities that aren't very important for prediction.
+A properly pruned model can reduce the amount of disk and memory storage space needed for the trained model, the amount of time it takes to train the model, and ultimately the amount of electricity used during model training---all while keeping a large portion of the original model's predictive power.
+A method of assessing each attribute's capacity to affect classification in order to determine which of the many attributes in our data set are the most crucial.
+Since we are employing a random forest model, fortunately, this has already been done.
+Each decision tree in the forest divides its data set according to some split criteria, with the most separable attributes leading to splits higher up the tree than those with less separation.
+We can easily rank the features' gross importance on the model by adding up the split criteria from each of the trees in our model:
+
+```{r}
+plot(varImp(rf_default))
+```
+
+The importances have been rated from 0 to 100, with 0 and 100 designating the least and most effective attributes, respectively.As we can see, chest_pain_type has a much greater influence on the forecast than fasting_blood_sugar.
+With the exception of chest_pain_type, all of the top 9 factors have about the same amount of an effect.
+However, after peak_st_slope, there is a noticeable fall in significance.
+With this knowledge, we will compare the reference model, which includes all attributes, to three models created using data sets that have been pruned.
+The most useful attribute, chest_pain_type, will only be used in the first trimmed model; the second and third models will consider the top five and top ten attributes, respectively.The significant plot outlined above will first be transformed into a list of characteristics that are prioritized.
+
+Get a list of the attribute names in the data set, ordered by importance descending
+
+```{r}
+cols_by_priority <- rownames(
+    arrange(
+      varImp(rf_default)$importance,    # Get importance values
+      desc(Overall)                     # Sort descending
+    )
+  )
+```
+
+Converting random forest training code from before into a reusable function for returning metrics for pruned models, which is a easy way to ensure that models are consistent.
+
+Return the metrics for a random forest model trained on the most important n attributes
+
+```{r}
+evaluate_pruned_rf_model <- function(top_n, importances = cols_by_priority, base_X_train = X_trainset, .y_trainset = y_trainset, trControl = training_controls) {
+    rf <- train(
+        base_X_train[importances[1:top_n]], # Select top n attributes
+        .y_trainset,
+        method = "rf",
+        trControl = training_controls,
+        # Fix hyperparameter 'mtry' at default value of sqrt(p) where p is the number of attributes in the data set
+        tuneGrid = expand.grid(
+            mtry = floor(sqrt(length(X_trainset[importances[1:top_n]])))
+        )
+    )
+    
+    return (cbind(rf$results, data.frame("n_attributes_selected" = top_n)))
+}
+```
+
+evaluating the performance of the random forests for various 'top n' attributes selected --- as well as reference model with all attributes --- saving their peformance metrics into a table:
+
+Creating a dataframe to store the metrics of each classifier
+
+```{r}
+results <- rbind(
+    evaluate_pruned_rf_model(1),                 # Top 1 attributes
+    evaluate_pruned_rf_model(5),                 # Top 5 attributes
+    evaluate_pruned_rf_model(10),                # Top 10 attributes
+    evaluate_pruned_rf_model(length(X_trainset))    # All attributes (reference)
+)
+```
+
+Viewing results
+
+```{r}
+results
+```
+
+This table isn't very clear, so we'll visualise our results in the form of a line graph which compares model accuracy versus the number of important attributes considered:
+
+Visualise results
+
+```{r}
+plot(
+    results$n_attributes_selected, results$Accuracy,
+    type = "b",
+    main = "Comparing prediction accuracy of random forest models given different amounts",
+    xlab = "Number of most important attributes in training set",
+    ylab = "Model accuracy",
+    col=ifelse(results$n_attributes_selected == length(X_trainset), "lightblue", "grey"),
+    cex=ifelse(results$n_attributes_selected == length(X_trainset), 2, 1.5),
+    pch=19,
+    xlim = c(0,20),
+    panel.first=grid()
+)
+legend(
+    "topleft",
+    legend = "Reference model",
+    col = "lightblue",
+    text.width = 3.5,
+    cex = 1.3,
+    pch = 19,
+    inset = 0.7
+)
+```
+
+Sampling
+
+The ratio of positive and negative samples is maintained in both subgroups since the training and test sets were obtained by stratified sampling.
+This is distinct from simple random sampling, where the training and test sets are chosen at random, resulting in an unbalanced ratio of positive to negative across the two sets.
+Because stratified sampling more accurately captures the original data and should result in a more generalizable model, it is considered to be preferable.
+
+The k-fold cross validation, in which each of the k subsets is sequentially omitted and used as validation once, also uses sampling.
+In contrast, bootstrapping uses random samples from the training set to assess accuracy, with each sample having the potential to be used several times for validation.
+The model will be retrained with both random sampling of the data to construct the training and test sets and employing bootstrapping for model validation in order to assess the influence of sampling on accuracy.
+
+```{r}
+paste(
+    "Source data set ratio ", round(nrow(subset(heart_dis, class == "dx_positive")) / nrow(subset(heart_dis, class == "dx_negative")), 2)
+  )
+```
+
+Training data set
+
+```{r}
+paste(
+  "Training data set ratio ", round(nrow(subset(trainset, class == "dx_positive")) / nrow(subset(trainset, class == "dx_negative")), 2)
+)
+```
+
+Testing data set
+
+```{r}
+paste(
+  "Testing data set ratio ", round(nrow(subset(test_set, class == "dx_positive")) / nrow(subset(test_set, class == "dx_negative")), 2)
+)
+```
+
+Because the ratios are so close to being equal, the subgroups have stayed true to the sample distribution.
+Another aspect of sampling that could affect our accuracy is the resampling method we employed for validation during training.
+We are now using k-fold cross validation, where each sample is used just once and portions of the training data are gradually eliminated to assess correctness.
+Random samples are selected from the training data set, and each sample may be utilized more than once to evaluate accuracy.
+Bootstrapping is the term for this approach.
+We will train a separate random forest estimator using bootstrapped resampling on a randomly sampled training data set to ascertain how these characteristics affect model performance:
+
+Generate randomly sampled training set
+
+```{r}
+random_train <- slice_sample(heart_dis, prop = 0.8)
+random_X_train = subset(random_train, select = -c(class))
+random_y_train = random_train$class
+```
+
+Train random forest model with bootstrapping and randomly sampled training set
+
+```{r}
+rf_bootstrapped <- train(
+    random_X_train, random_y_train,
+    method = "rf",                  # Use library(randomForest) model
+    trControl = trainControl(
+        method = "boot",            # Resample using bootstrapping
+        savePredictions = "all",    # Save predictions at each resampling
+        classProbs = TRUE           # Additionally, compute class probabilities at each resampling
+    ),
+    # Fix hyperparameter 'mtry' at default value of sqrt(p) where p is the number of attributes in the data set
+    tuneGrid = expand.grid(
+        mtry = floor(sqrt(length(X_trainset)))
+    )
+)
+```
+
+View model details
+
+```{r}
+print(rf_bootstrapped)
+```
+
+Generate confusion matrix
+
+```{r}
+confusionMatrix(rf_bootstrapped, norm = "none")
+```
+
+As a result of the model's accuracy remaining stable at 82%, it behaved quite similarly to the reference model.
+However, the model's sensitivity dropped from 0.87, which the reference model achieved, to 30963096+521=0.856.
+Our confusion matrix, which shows a total of many more samples than there are in our data set, is an intriguing side point, nevertheless.
+The results of this optimization effort are typically rather dull.
+This is so that samples don't show more than once in the confusion matrix because our bootstrap resampling method uses replacement sampling, which doesn't check samples' exclusivity from one another.
+Optimization of hyperparameters - As our final optimisation strategy, we employ hyperparameter optimization to determine the random forest model's ideal configuration for our data.
+
+Train random forest model and optimise hyperparameters
+
+```{r}
+ optimised_rf <- train(
+    X_trainset, y_trainset,
+    method = "rf",                  # Use library(randomForest) model
+    trControl = trainControl(
+      method = "cv",
+      number = k,
+      search = "random",          # Random parameter search
+      savePredictions = "all",    # Save predictions at each resampling
+      classProbs = TRUE           # Additionally, compute class probabilities at each resampling
+    ),
+    tuneLength = 16,                # Number of values to consider when tuning
+    ntree = 4500                    # Number of trees in forest
+  )
+```
+
+View model details
+
+```{r}
+print(optimised_rf)
+```
+
+Generate confusion matrix
+
+```{r}
+confusionMatrix(optimised_rf, norm = "none")
+```
+
+With a test set accuracy of 78%, the accuracy on unobserved data has improved by 2%, and the sensitivity has increased by 2% as well.
+Additionally, by altering the number of trees (n), we explored various random forest sizes and found that ntrees = 4500 gave more stable accuracy results.
+A word on having trustworthy data.
+Usually, the quality of a classifier depends on the data it was trained on.
+Generally speaking, it is essential to have high-quality data that has been validated by a subject-matter expert, is relevant, and provides a precise picture of the problem's context.
+Good data sets should reflect as much knowledge as possible with the fewest possible attributes in order for systems to be powerful yet quick, and this information should be as precise and thorough as possible.
+By displaying the system's performance in a setting that matters to the doctors who will utilize it, classifiers can provide feedback into healthcare settings.
+A good system that improves human abilities should be enjoyable to use and entice users to continue providing it with high-quality, trustworthy information so that it can continue to develop.
+Classifiers can offer feedback into healthcare settings by providing the system's performance in a context that matters to the clinicians who will use it.
+A good system that enhances human talents should be pleasurable to use and encourage users to keep giving it reliable, high-quality data so that it can advance.
+
+## THANK YOU

@@ -1,0 +1,606 @@
+---
+editor_options:
+  markdown:
+    wrap: 72
+---
+
+PMIM402J MACHINE LEARNING IN HEALTHCARE
+
+NEHA 2254818
+
+PART 1 - CLUSTERING ASSIGNMENT
+
+DATASET - "heart-c.csv" (Clustering Data)
+
+**Question 1:\
+Run K-means clustering on the above heart disease dataset and answer the
+following questions**
+
+K-means is a form of unsupervised Machine Learning algorithm which is
+used for clustering data points into distinct groups where k is the
+number of clusters. Global Attributes like k is the number of clusters,
+maximum number of iterations, random seed which ensures reproducibility
+of results Firstly, k-means algorithm allocates k number of cluster
+centroids n the data space and are optimised by decreasing the
+metric-"goodness of fit" this metric is the sum of squared distances
+between each data point and its corresponding cluster centroid. The
+algorithm iteratively reassigns data points to the closest centroid and
+the centroids positions are updated by the new data points which is
+assigned. This iteration is done until there is no change in the
+centroids or until the maximum iterations is reached. Here, it has found
+the best centroid positions and clusters are stable. this is called the
+Convergence point, where a data point is assigned to a closest cluster
+centroid, is the final cluster for each of the data point. When it comes
+to deciding the number of clusters that is K value, it requires
+interpretation, validation and observation. So that the clusters makes
+sense and aligns with real-world patterns.
+
+To perform K-means clustering on the data provided, importing the data
+is the first step. The data is in CSV file, which is in structured
+format.
+
+#### importing R packages #collection of R packages(ggplot2,dplyr,tidyr) #data manipulation and visualization
+
+```{r}
+library(tidyverse)  
+library(factoextra) #this package is used for creating plots and visualization
+library(cowplot)    #creating plots and graphs
+library(cluster)    #clustering functions
+```
+
+#Importing the heart disease data set
+
+```{r}
+heart_disease <- read_csv("/Users/neha-/Desktop/PMIM402J-MLH/clustering data.csv")
+```
+
+since the data set is in structured csv format, I am using read.csv()
+function the data is read into the data frame named 'heart_disease'
+
+```{r}
+heart_disease <- na.omit(heart_disease)
+```
+
+removing rows with missing data Using na.omit() function to remove rows
+from data frame which might contain missing values like NA, which will
+ensure we have complete data further. Fixing the global seed for
+reproducibility(across different runs of the script)
+
+```{r}
+set.seed(15) 
+```
+
+to set a seed for the random number generator. This will help in getting
+consistent results which makes it easier to compare and validate the
+output. Since I will be creating plots, I am setting the options for
+size of plots which will be created subsequently in this current R
+session.
+
+```{r}
+options(repr.plot.width=14, repr.plot.height=10)
+```
+
+the size of plots will have width of 12 inches and height of 8 inches.
+Explicitly setting ggplot2 theme to default cowplot theme
+
+```{r}
+theme_set(theme_cowplot())
+```
+
+1\. Why should the attribute "class" in heart-c.csv("num")not be
+included for clustering?
+
+In the d ataset, the attribute 'num' represents Diagnosis of heart
+disease.Basically it is classified attribute, and is not needed in
+Clustering Because Clustering will be done without using ground truth
+labelled information By removing 'diagnosis' i.e., 'num' attribute, The
+Clustering algorithm is executed only on other attributes like age,
+sex,..which helps in identifying natural groupings or clusters based on
+similarities. renaming attributes to make it easier to understand
+
+Saving a copy of the original data set with the ground truth 'num'
+attribute for later, so I can compare it with clustering results.
+
+```{r}
+heart_original <- heart_disease
+
+```
+
+Removing the diagnosis attribute so that it is suitable for Unsupervised
+Clustering Process
+
+```{r}
+heart_disease <- subset(heart_disease, select = -c(num))
+
+#Viewing the dataset after removing the 'diagnosis' attribute.
+
+head(heart_disease, 20)
+
+```
+
+By understanding the nature and characteristics of each attribute, I see
+that the data set comprises of both continuous and categorical
+attributes, but K-means Clustering is suitable for Continuous attributes
+because it requires projecting data into a Continuous domain. Continuous
+Attibutes are numerical, by taking real value and represents
+measurements on continuous scale range.
+
+Continuous attributes: age,
+resting_blood_pressure,cholesterol,max_heart_rate,
+relative_st_depression, and fluoroscopy_count. Categorical attributes:
+sex, chest_pain_type, fasting_blood_sugar, resting_ecg_result,
+has_exercise_angina, peak_st_slope, thallium_test_result, diagnosis
+
+Since the projection of categorical attributes is meaningless, I am
+filteringonly continuous attributes
+
+```{r}
+heart_continuous <- Filter(is.numeric, heart_disease) # is.numeric function checks if variable is numeric - True or not - False. # Filter() function is used to select numeric columns 
+```
+
+\# Viewing the Continuous attributes only
+
+```{r}
+ head(heart_continuous)
+```
+
+Applying standardization or z-score normalization which transforms in a
+way that mean becomes 0 and standard deviation becomes 1
+
+```{r}
+heart_continuous <- scale(heart_continuous) # scale() function is used to standardize columns of data frame.
+```
+
+Viewing the heart disease data set with only continuous attributes
+
+```{r}
+head(heart_continuous)
+```
+
+2.Run the K-means algorithm and provide reasoning for the optimum value
+of K. I can now apply k-means Clustering analysis, but for that first,
+optimal value for k which produces best clustering is required. I am
+using few statistical methods, to compare and find the effectiveness of
+different k values. By calculating within-cluster sum of squares (WCSS).
+WCSS is sum of squared distances between data points and their assigned
+cluster centroids which are compact and tightly grouped clusters.
+
+This is called the Elbow Method, the name comes from shape of the plot,
+where line forms an 'elbow-like' bend at the optimal value of k.
+
+Plotting the elbow curve using 'fviz_nbclust()' function
+
+```{r}
+fviz_nbclust(
+  x = heart_continuous, #preprocessed dataset with only continuous attributes
+  FUN = kmeans,    # k means clustering function is used
+  method = "wss", # Within Sum of Squares method - calculates WCSS for k value
+  k.max = 10, # maximum value of K:10, all the values from 1 to 10 is plotted
+  linecolor = "black"
+) +
+  theme(
+    panel.grid.major = element_line() # Adds gridlines to the plot for clarity
+  )
+```
+
+3.Which features would you expect to be less useful when using K-means
+and why? From the plot, there's no obvious elbow point and few more
+comparisons are needed before deciding the best k value. when k = 1, a
+single cluster is formed which is not informative and it groups all data
+together without any differentiation when k \>=6, as number of clusters
+increases beyond 5 or 6 the decrease in WCSS, when k = 2\~5, curve shows
+more gradual decrease in WCSS and no clear elbow point the levelling off
+indicates the clustering with 2 to 5 clusters might be reasonable
+additional techniques like Silhouette analysis, Principal Component
+Analysis(PCA) and Gap Statistics can be applied.
+
+Gap Statistics compare the clustering performance to that of a random
+distribution, Maximizing it to find the optimal value .This compares the
+WCSS of actual clustering to the reference distribution to estimate gap
+between clustering performance and random data.
+
+Plotting gap statistics
+
+```{r}
+fviz_nbclust(
+  x = heart_continuous,
+  FUN = kmeans,    # k means type of function
+  method = "gap_stat", # gap statistics method
+  nboot = 28,    # Number of start permutations
+  k.max = 10,
+  linecolor = "black"
+) +
+  theme(
+    panel.grid.major = element_line()    # Adding gridlines to the plot
+  )
+```
+
+when𝑘=2, has the largest gap statistic and is looking to be the most
+optimal
+
+clustering.
+
+Performing Principal Component Analysis(PCA) for visualising cluster in
+2D
+
+generating k means clustering models with k in range [2,k]
+
+we have now understood that k=1 creates a meaningless cluster
+
+```{r}
+kmeans_model <- function(dataset, k_max , n_start = 25) {
+  # Store results in a list
+  results <- c()
+  
+  # Iterate through range [2, k_max]
+  for (k in 2:k_max) {
+    # Assign results[k] to k-means
+    results[[as.character(k)]] <- kmeans(
+      x = dataset,
+      centers = k,
+      nstart = n_start,    # Trying different random starting positions and 
+                           # picking up the best one
+      iter.max = n_start   # Increase iteration limiter
+    )
+  }
+  return(results)
+}
+```
+
+I am using kmeans_model function to generate k means clustering models
+for k in range of 2 to 10 and print description of one of them.
+
+Maximum value of k to consider
+
+```{r}
+k_max = 10
+```
+
+Calculate and storing the results of k-means run from 2 \~ k_max
+
+```{r}
+kmeans_results <- kmeans_model(heart_continuous, k_max)
+```
+
+Preview a clustering result
+
+```{r}
+kmeans_results[[2]]
+```
+
+Plotting using PCA for all k values. PCA is a reduction technique which
+helps in visualising high dimensional data in a lower dimensional space
+like 2D or 3D.
+
+**Increase plot size**
+
+```{r}
+options(repr.plot.width=28, repr.plot.height=20)
+```
+
+#### Create chart objects for each clustering model
+
+```{r}
+chart_object <- list()
+```
+
+the below loop iterates over the results of kmeans clustering for
+different k
+
+values from 2 to length of kmeans_results
+
+```{r}
+for (i in 2:length(kmeans_results)) {
+    # Visualise each clustering result
+    chart_object[[i]] <- fviz_cluster(
+        kmeans_results[[i]],
+        data = heart_continuous,
+        geom = "point",
+        show.clust.cent = TRUE
+    ) + 
+    ggtitle(
+        paste(c("k =", i, "\navg cluster size =", round(mean(kmeans_results[[i]]
+                                                             $size),1),"points"),
+              collapse = " ")    # Title each chart: "k = i; avg cluster size = 
+                                 # n points"
+    )
+}
+```
+
+# View the charts
+
+when k=2, the plots are very clear and gives clarity, it is segmented
+
+For all other vlues of k, it has at least some overlap. for the purpose
+of evaluating, I am now including the data set with ground truth
+labelled data
+
+When k =2, an increased level of heart disease are colored green and
+those without are colored red
+
+#The cluster centroids and outline are in Teal and Magenta for cluster 1
+and 2.
+
+Attach ground truth attribute to k=2 chart color channel and visualise
+
+#From this chart object, it looks like the clustering is largely
+accurate, #with green and red points within cluster 1 and 2 #For a more
+quantitative analysis of the clustering's performance, we'll #determine
+its sensitivity, specificity, and accuracy.
+
+We need to get the clustering result for each sample, which we can most
+easily, obtain by extracting it from the above chart object
+
+Extracting chart object data from k=2 plot
+
+```{r}
+k2_data <- layer_data(chart_object[[2]], 1)
+```
+
+Extracting cluster attribute from chart object and converging it with
+the original heart data table
+
+```{r}
+heart_original$cluster <- k2_data$group
+```
+
+Observe new cluster attribute
+
+```{r}
+head(heart_original, 5)
+```
+
+I am able to directly compare the results of the clustering with the
+ground truth labels, assuming that patients with an increased level of
+heart disease where diagnosis = "\>50_1" are in cluster 2, and those
+without where diagnosis = "\<50" are in cluster 1.
+
+```{r}
+pos = c() 
+neg = c()
+```
+
+#### True positives
+
+```{r}
+pos["True"] = nrow(heart_original[which(heart_original$num == ">50_1"
+                                             & heart_original$cluster == 2),])
+```
+
+#### False positives
+
+```{r}
+pos["False"] = nrow(heart_original[which(heart_original$num == ">50_1"  & heart_original$cluster == 1),])
+```
+
+#### True negatives
+
+```{r}
+neg["True"] = nrow(heart_original[which(heart_original$num == "<50"  & heart_original$cluster == 1),])
+```
+
+#### False negatives
+
+```{r}
+neg["False"] = nrow(heart_original[which(heart_original$num == "<50"  & heart_original$cluster == 2),])
+```
+
+#### Constructing confusion matrix
+
+```{r}
+confusion_matrix = data.frame(pos, neg)
+```
+
+#### Viewing confusion matrix
+
+```{r}
+print(confusion_matrix)
+```
+
+#### To evaluate the clustering performance, I am calculating the metrics:
+
+```{r}
+paste("Sensitivity:", round(pos["True"] / (pos["True"] + pos["False"]), 3))
+paste("Specificity:", round(neg["True"] / (neg["True"] + neg["False"]), 3))
+paste("Accuracy:", round((pos["True"] + neg["True"]) / (pos["True"] + 
+                                                          neg["True"] + 
+                                                          pos["False"] + 
+                                                          neg["False"]),3))
+```
+
+Question 2:
+
+Run the hierarchical clustering on above heart disease dataset, and
+answer the following questions
+
+Hierarchical clustering techniques is unsupervised machine learning
+technique, it groups similar data points into clusters based on their
+similarity and dissimilarity. Each data point starts as its own and
+builds a tree like hierarchical structure of clusters, forming a tree
+called as Dendrogram.
+
+This gives more flexible, clear and accurate explanation than k-means
+because it doesn't require to specify the number of clusters beforehand.
+Agglomerative hierarchical cluster starts with each data point as its
+own cluster and iteratively merges most similar clusters until all data
+points are combined into one cluster. ( bottom-up )
+
+Divisive hierarchical cluster starts with all data points in one cluster
+and recursively divides the cluster into smaller clusters until each
+data point is in its own individual cluster. ( top-down)
+
+#Divisive clustering aims to achieve fewer, larger clusters.
+
+# Preview
+
+```{r}
+head(heart_continuous)
+```
+
+1.Show the clustering results in a tree structure and provide reasoning
+for the optimal number of clusters
+
+#We perform the divisive clustering using Euclidean distances(measures
+straight line distance between two points in multi dimensional space) as
+our dissimilarity measure and represent the splitting of our data set
+using a dendrogram
+
+#diana() function is a part of cluster package which allows to perform
+divisive \# hierarchical clustering
+
+```{r}
+divisive <- diana(heart_continuous, metric = "euclidean")
+
+fviz_dend(
+  divisive,
+  main = "Divisive hierarchical clustering of the heart data set (continuous vars only)",
+  cex = 0.4,    # Resize leaf node labels
+) + scale_y_continuous(
+  name = "Dendrogram height",
+  n.breaks = 10    # Individual y-axis labels
+)
+```
+
+#The dendrogram allows to see which groups that samples have been
+divided into. Reading from top to bottom, the divisive clustering has
+sectioned the data until each sample is in its own cluster.
+
+```{r}
+k = 5
+```
+
+```{r}
+fviz_dend(
+  divisive,
+  cex = 0.4,
+  main = "Divisive hierarchical clustering of the heart data set (continuous 
+  vars only) - clusters highlighted",
+  k = k    # Choose split point
+) + geom_hline(
+  yintercept = 9,    # Should be (height - k) for a dendrogram that isn't squished
+  linetype = "dashed",
+  color = "navy"
+) + scale_y_continuous(
+  name = "Dendrogram height",
+  n.breaks = 10    # Individual y-axis labels
+)
+```
+
+#The dendrogram is cluttered a little and y-intercept line is a bit off,
+however the different colours show the split of clusters clearly. In
+this case, the red cluster is far bigger than the other clusters ---
+indicating that the divisive clustering is kind of unbalanced.
+
+In summary, the divisive coefficient is efficient to measure an overall
+'goodness of fit' of the clustering based on how well separated and
+balanced each cluster is --- values are in the range [0, 1], with a
+value of 1 meaning clusters are completely separated and each cluster is
+the same size.
+
+```{r}
+paste("Divisive coefficient:", round(divisive$dc, 5))
+```
+
+\#'Divisive coefficient: 0.84506'
+
+#which is a very high coefficient value, makes me believe that divisive
+clustering is effective at producing clusters; however it is difficult
+to take a single metric like this with no context or comparison and
+derive a conclusion. Additionally, there are certain aspects that the
+coefficient cannot tell,like how many clusters are most optimal or by
+which factors the data set has been clustered by --- further analysis is
+required for this.
+
+Comparing with agglomerative clustering - Using differing linkage
+methods, I will compare the results of Divisive clustering and
+Agglomerative clustering which should be able to give ' goodness of fit'
+for each dendrogram. Very similarly to
+
+2.Describe the link method you used.
+
+3.What are the strengths and limitations of this link method in
+hierarchical clustering?
+
+#The five different linkage methods which will be evaluated are:
+1.single-linkage, where the closest single pair of elements are not in
+the same cluster are considered as linkage criteria 2.complete-linkage,
+where the furthest away single pair of elements not in the same cluster
+are considered as linkage criteria 3.weighted average-linkage (WPGMA),
+where the linkage criteria is a simple average of the distance between
+clusters 4.unweighted average-linkage (UPGMA), where the linkage
+criteria is the average distance between clusters, where the number of
+samples in the cluster are accounted for - making it 'unweighted'
+5.Ward's method, where the linkage criteria is the pair of clusters
+which, after merging, increases the total within-cluster variance by the
+smallest amount; minimising the within-cluster variance
+
+# Calculating Euclidean dissimilarity matrix
+
+```{r}
+diss_matrix = dist(heart_continuous, method = "euclidean")
+
+aggl_single   <- agnes(diss_matrix, method = "single")
+aggl_complete <- agnes(diss_matrix, method = "complete")
+aggl_wpgma    <- agnes(diss_matrix, method = "weighted")
+aggl_upgma    <- agnes(diss_matrix, method = "average")
+aggl_ward     <- agnes(diss_matrix, method = "ward")
+
+aggl = list(
+  "single" = aggl_single,
+  "complete" = aggl_complete,
+  "WPGMA" = aggl_wpgma,
+  "UPGMA" = aggl_upgma,
+  "Ward's method" = aggl_ward
+)
+```
+
+# Create chart objects for each clustering model
+
+```{r}
+chart_object <- list()
+
+for (i in 1:length(aggl)) {
+  # Visualise each clustering result
+  chart_object[[i]] <- fviz_dend(
+    aggl[[i]],
+    cex = 0.4
+  ) + 
+    ggtitle(
+      # Dynamically title each chart
+      paste(c(
+        "Agglomerative clustering using the", names(aggl)[[i]], "linkage method\n",
+        "Agglomerative coefficient:", round(aggl[[i]]$ac, 3)
+      ), collapse = " ")
+    ) +
+    scale_y_continuous(
+      name = "Dendrogram height",
+      n.breaks = 10    # Individual y-axis labels
+    )
+}
+```
+
+# Increasing the plot size again
+
+```{r}
+options(repr.plot.width=42, repr.plot.height=24)
+```
+
+# View the charts
+
+```{r}
+plot_grid(plotlist = chart_object)
+```
+
+#From the comparison that Ward's method is, at least in terms of
+clustering quality, the superior linkage method --- with an excellent
+agglomerative coefficient of 0.959 and visually balanced and
+well-separated. Conversely, single-linkage and UPGMA have the lowest
+coefficient scores and visually the dendrograms are tightly packed,
+skewed, and overall poorly separated. It is worth reiterating the fact
+that our 'best' clustering method is meaningless if it is not applied to
+a particular issue and analysed by a domain expert; the coefficient
+score simply ranks the structure of the dendrogram rather than
+evaluating the accuracy of its clustering.
+
+'Ward's method' of selecting linkage criteria produces tight, packed
+clusters that is good at determine large-scale patterns in the data.
