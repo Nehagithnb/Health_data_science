@@ -4,11 +4,7 @@ editor_options:
     wrap: sentence
 ---
 
-# PMIM402J MACHINE LEARNING IN HEALTHCARE
-
-# PART 2: CLASSIFICATION ASSIGNMENT
-
-## NEHA 2254818
+# MACHINE LEARNING IN HEALTHCARE
 
 DATASET - "heart_modified.csv" (Classification Data)
 
