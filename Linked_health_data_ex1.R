@@ -2,7 +2,7 @@
 
 #to set the working directory to this particular folder 
 #where all the files and data are place
-setwd("~/Desktop/PMIM302-IALHD")
+setwd("~/Desktop/IALHD")
 
 #to list all the files in that directory
 list.files()
