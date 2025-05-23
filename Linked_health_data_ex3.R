@@ -1,6 +1,6 @@
 # Q1. ####
 # Set working directory to the path where your R Data files are, e.g.
-setwd("~/Desktop/PMIM302-IALHD")
+setwd("~/Desktop/IALHD")
 load("vaslinks4.RData")
 
 # Q2. ####
