@@ -1,11 +1,5 @@
-#PMIM102J ASSESSMENT JAN 2023
 #SCIENTIFIC COMPUTING AND HEALTHCARE
-
-
-# NEHA
-# 2254818
 # MARCH 06 2023
-
 
 #packages installation
 
@@ -1140,4 +1134,4 @@ print(Asthma)
 View(Asthma)
 
 
-############################ END OF ANALYSIS 
+######################## END OF ANALYSIS ##########################
